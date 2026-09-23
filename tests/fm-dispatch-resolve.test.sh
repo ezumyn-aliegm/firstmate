@@ -7,6 +7,8 @@
 # A fake quota-axi serves the selected schema-5 fixture. No case touches the
 # network, and the absent-key case proves the tool makes no call
 # at all.
+# FM_DISPATCH_CATALOG_ONLY=1 runs only literal-model and daily-catalog dispatch
+# cases through the same mocks; the default suite retains every quota case.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -183,6 +185,7 @@ run_without_curl() {
 KEY='test-key-9f1c2d3e-never-on-argv'
 code='' out='' err=''
 
+if [ "${FM_DISPATCH_CATALOG_ONLY:-0}" != 1 ]; then
 # --- absent key: off, silent on stdout, no network, no quota read -----------
 reset_log
 write_response "$RESPONSE" rule_4 0.9
@@ -634,5 +637,39 @@ run code out err --help
 expect_code 0 "$code" "--help exits 0"
 assert_contains "$out" 'Usage:' "--help prints usage"
 pass "configuration errors exit 2 before any network call"
+fi
 
-printf '# all fm-dispatch-resolve tests passed\n'
+# --- daily catalog roles are read locally, even when stale --------------------
+[ "${FM_DISPATCH_CATALOG_ONLY:-0}" != 1 ] || command -v node >/dev/null 2>&1 || fail "node required for catalog validation"
+if command -v node >/dev/null 2>&1; then
+  reset_log
+  write_response "$RESPONSE" rule_4 0.9
+  TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+  expect_code 0 "$code" "literal models work without a daily catalog"
+  assert_contains "$out" "profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" "literal model dispatch is preserved"
+  reset_log
+  jq '.rules[3].use[1].model = "@current"' "$BASE_RULES" > "$RULES"
+  cat > "$HOME_DIR/config/model-catalog.json" <<'JSON'
+{"generatedAt":"2000-01-01T00:00:00Z","harnesses":{"cursor":{"roles":{"current":{"model":"grok-4.7-medium","source":"Artificial Analysis","effort":"medium"}}}}}
+JSON
+  touch -t 200001010000 "$HOME_DIR/config/model-catalog.json"
+  cat > "$TMP_ROOT/no-aa.cjs" <<'JS'
+globalThis.fetch = () => { throw new Error('AA must not be called by dispatch'); };
+JS
+  no_aa_loader=$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$TMP_ROOT/no-aa.cjs")
+  TYPESAFE_API_KEY=$KEY NODE_OPTIONS="--require=$no_aa_loader" run code out err "$BRIEF"
+  expect_code 0 "$code" "stale daily catalog resolves"
+  assert_contains "$out" "profile: --harness 'cursor' --model 'grok-4.7-medium'" "dispatch uses cached role"
+  assert_not_contains "$out" '--effort' "Cursor catalog role keeps effort in model id"
+  assert_absent "$HOME_DIR/config/artificial-analysis.json" "dispatch never creates an AA cache"
+  assert_not_contains "$(cat "$LOG/body")" 'grok-4.7-medium' "catalog model never goes to Jev"
+  reset_log
+  rm "$HOME_DIR/config/model-catalog.json"
+  TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+  expect_code 2 "$code" "missing daily catalog fails closed"
+  assert_absent "$LOG/argv" "missing catalog makes no network request"
+  cp "$BASE_RULES" "$RULES"
+  pass "dispatch expands stale on-disk roles without calling AA and fails closed when missing"
+fi
+
+printf '# fm-dispatch-resolve tests passed (catalog-only=%s)\n' "${FM_DISPATCH_CATALOG_ONLY:-0}"
