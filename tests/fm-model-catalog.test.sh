@@ -156,10 +156,10 @@ try {
   priced.artificialAnalysis.data[4].pricing.price_1m_blended_3_to_1 = 10;
   const changed = json('score', priced);
   assert.equal(json('pick', changed, ['cursor', 'current']).model, 'grok-4.7-medium');
-  assert.equal(json('pick', changed, ['cursor', 'cheap']).model, 'grok-4.7-high');
+  assert.equal(json('pick', changed, ['cursor', 'cheap']).model, 'grok-4.7-medium');
   const missingPrice = structuredClone(input);
   missingPrice.artificialAnalysis.data[4].pricing = {};
-  assert.equal(json('score', missingPrice).harnesses.cursor.roles.cheap.model, 'grok-4.7-high');
+  assert.equal(json('score', missingPrice).harnesses.cursor.roles.cheap.model, 'grok-4.7-medium');
   const onlyHigh = json('score', { ...input, cursorText: 'gpt-5.6-sol-high - High' });
   assert.equal(run('pick', onlyHigh, ['cursor', 'current']).status, 1);
   assert.equal(run('score', { ...input, artificialAnalysis: { data: [] } }).status, 1);

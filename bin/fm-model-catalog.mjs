@@ -219,13 +219,15 @@ function matchesRoleEffort(row, role) {
 
 function pickForRole(standard, role, aaAvailable = false) {
   if (aaAvailable) {
-    const eligible = standard.filter((m) => role === ROLE_CHEAP
-      ? !EXCLUDED_ROLE_EFFORT.has(m.effort) : matchesRoleEffort(m, role));
+    const eligible = standard.filter((m) => matchesRoleEffort(m, role));
+    const effortRank = (m) => (m.effort === "low" ? 0 : m.effort === "medium" ? 1 : 2);
     const measured = eligible.filter((m) => m.source === "Artificial Analysis"
       && (role === ROLE_FLAGSHIP || m.price != null));
     const metric = role === ROLE_FLAGSHIP ? "quality" : role === ROLE_CURRENT ? "qualityPerDollar" : "economy";
     if (measured.length) return [...measured].sort((a, b) =>
-      b[metric] - a[metric] || b.quality - a.quality || a.id.localeCompare(b.id))[0];
+      b[metric] - a[metric] || b.quality - a.quality
+      || (role === ROLE_CHEAP ? effortRank(a) - effortRank(b) : 0)
+      || a.id.localeCompare(b.id))[0];
     // Preserve availability for an entirely unmeasured harness, but never mix
     // heuristic weights with measured indices or assign an incompatible effort.
     const unmatched = eligible.filter((m) => m.source !== "Artificial Analysis");
