@@ -136,10 +136,8 @@ function scoreRow({ id, label = "", extra = {} }, aa = null) {
   const slug = id.toLowerCase().replaceAll(".", "-");
   const measured = aa.get(slug) || aa.get(claudeSpawnId(slug));
   const evaluations = measured?.evaluations;
-  const coding = evaluations?.artificial_analysis_coding_index;
-  const intelligence = evaluations?.artificial_analysis_intelligence_index;
+  const index = evaluations?.artificial_analysis_intelligence_index;
   const usable = (value) => typeof value === "number" && Number.isFinite(value) && value > 0;
-  const index = usable(coding) ? coding : intelligence;
   if (!usable(index)) return { ...row, source: "generation" };
   const pricing = measured.pricing || {};
   let price = pricing.price_1m_blended_3_to_1;
@@ -154,8 +152,7 @@ function scoreRow({ id, label = "", extra = {} }, aa = null) {
     ...row, source: "Artificial Analysis", aaSlug: measured.slug,
     quality: index, economy: price == null ? null : 1 / price,
     qualityPerDollar: price == null ? null : index / price,
-    price, index: usable(coding) ? "coding" : "intelligence",
-    weight: index,
+    price, weight: index,
   };
 }
 

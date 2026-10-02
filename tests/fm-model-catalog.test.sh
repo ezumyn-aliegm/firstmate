@@ -103,18 +103,18 @@ import { pathToFileURL } from 'node:url';
 const scorer = process.argv[2];
 const temp = mkdtempSync(path.join(tmpdir(), 'fm-aa-test-'));
 try {
-  const model = (slug, intelligence, coding, input, output, blended) => ({
-    slug, evaluations: { artificial_analysis_intelligence_index: intelligence, artificial_analysis_coding_index: coding },
+  const model = (slug, intelligence, input, output, blended) => ({
+    slug, evaluations: { artificial_analysis_intelligence_index: intelligence },
     pricing: { price_1m_input_tokens: input, price_1m_output_tokens: output, price_1m_blended_3_to_1: blended },
   });
   const aa = { data: [
-    model('grok-4-7', 46.4, null, 2, 6),
-    model('gpt-5-6-sol-high', 42.3, 77.2, 4, 20),
-    model('gpt-5-6-sol-medium', 42.3, 60, 4, 20),
-    model('gpt-6-astra', 52.7, null, 10, 50),
-    model('gpt-4-mini', 20, null, 1, 1),
-    model('gpt-7-high-fast', 100, 100, 0.01, 0.01),
-    model('gpt-8-high', null, null, 0.01, 0.01),
+    model('grok-4-7', 46.4, 2, 6),
+    model('gpt-5-6-sol-high', 42.3, 4, 20),
+    model('gpt-5-6-sol-medium', 42.3, 4, 20),
+    model('gpt-6-astra', 52.7, 10, 50),
+    model('gpt-4-mini', 20, 1, 1),
+    model('gpt-7-high-fast', 100, 0.01, 0.01),
+    model('gpt-8-high', null, 0.01, 0.01),
   ] };
   function run(command, payload, args = [], env = {}, imports = []) {
     return spawnSync(process.execPath, [...imports, scorer, command, ...args], {
@@ -140,8 +140,8 @@ try {
   };
   const catalog = json('score', input);
   const pick = (role) => json('pick', catalog, ['cursor', role]);
-  assert.equal(pick('flagship').model, 'gpt-5.6-sol-high');
-  assert.equal(pick('flagship').quality, 77.2);
+  assert.equal(pick('flagship').model, 'gpt-6-astra');
+  assert.equal(pick('flagship').quality, 52.7);
   assert.equal(pick('current').model, 'gpt-4-mini');
   assert.equal(pick('cheap').model, 'gpt-4-mini');
   assert.match(catalog.attribution, /Artificial Analysis/);
@@ -164,7 +164,7 @@ try {
   assert.equal(run('pick', onlyHigh, ['cursor', 'current']).status, 1);
   assert.equal(run('score', { ...input, artificialAnalysis: { data: [] } }).status, 1);
   assert.equal(run('expand', { catalog, dispatch: { default: { harness: 'unknown', model: '@cheap' } } }).status, 1);
-  const noGeneration = json('score', { cursorText: 'o3 - Coding model', artificialAnalysis: { data: [model('o3', 30, null, 1, 2)] } });
+  const noGeneration = json('score', { cursorText: 'o3 - Coding model', artificialAnalysis: { data: [model('o3', 30, 1, 2)] } });
   assert.equal(noGeneration.harnesses.cursor.roles.current.model, 'o3');
   console.log('ok - AA roles honor quality, price, effort, missing measurements, slug mapping and fast exclusions');
 
