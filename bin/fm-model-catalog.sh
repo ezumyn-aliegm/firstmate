@@ -13,7 +13,8 @@
 #                                    the catalog; print JSON on stdout
 #
 # Roles: flagship = highest AA Intelligence Index at high/default effort;
-# current = best quality/price at medium/default; cheap = best measured economy.
+# current = best quality/price at medium/default; cheap = best measured economy at low/medium/default
+# effort, preferring the lowest effort on ties.
 # Fast SKUs never receive roles. Unmatched models retain generation scoring.
 # Price is USD per million tokens: blended 3:1 when present, else input + output.
 # ARTIFICIAL_ANALYSIS_API_KEY or Windows secret-vault's artificial-analysis-api-key
