@@ -12,7 +12,7 @@
 #                                    resolve @flagship/@current/@cheap against
 #                                    the catalog; print JSON on stdout
 #
-# Roles: flagship = highest AA coding/intelligence index at high/default effort;
+# Roles: flagship = highest AA Intelligence Index at high/default effort;
 # current = best quality/price at medium/default; cheap = best measured economy.
 # Fast SKUs never receive roles. Unmatched models retain generation scoring.
 # Price is USD per million tokens: blended 3:1 when present, else input + output.
