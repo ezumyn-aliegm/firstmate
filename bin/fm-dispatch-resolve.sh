@@ -116,6 +116,15 @@ command -v jq >/dev/null 2>&1 || die "jq required"
 RULES=$(mktemp) || die "mktemp failed"
 trap 'rm -f "$RULES"' EXIT
 cp "$RULES_PATH" "$RULES" || die "could not snapshot rules file: $RULES_PATH"
+# Resolve roles from the daily catalog without refreshing it on the spawn path.
+if jq -e '[.. | objects | .model? | strings | startswith("@")] | any' "$RULES" >/dev/null; then
+  EXPANDED=$(mktemp) || die "mktemp failed for catalog expand"
+  if [ ! -r "$CONFIG/model-catalog.json" ] || ! "$FM_ROOT/bin/fm-model-catalog.sh" --expand "$RULES" > "$EXPANDED"; then
+    rm -f "$EXPANDED"
+    die "catalog roles require the daily model catalog"
+  fi
+  mv "$EXPANDED" "$RULES" || die "could not install expanded rules"
+fi
 chmod 400 "$RULES" || die "could not protect rules snapshot"
 VERIFIED_HARNESSES=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 
