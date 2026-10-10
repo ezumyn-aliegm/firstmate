@@ -3925,6 +3925,64 @@ test_composer_state_grok_oversized_title_preserves_safe_verdicts() {
   pass "fm_backend_herdr_composer_state: Grok's exact title overhang is empty while pending and unproved panes remain safe"
 }
 
+# Grok 1.0.50 prints its approval mode after the model/effort title on the
+# composer's bottom border, joined by a one-column `·`. Before the fix an idle
+# main Grok pane read `unknown`, so away-mode deferred every escalation for
+# about nine hours. The first screen is a verbatim idle Herdr capture.
+grok_titled_box() {  # <inner-width> <title> <content> -> three box rows
+  local width=$1 title=$2 content=$3 rule='' pad i ascii
+  # Count `·` as its one column under any locale.
+  ascii=${title//·/.}
+  pad=$((width - ${#ascii} - 3))
+  for ((i = 0; i < width; i++)); do rule="${rule}─"; done
+  printf '  ╭%s╮\n' "$rule"
+  printf '  │ ❯ %-*s│\n' "$((width - 3))" "$content"
+  rule=''
+  for ((i = 0; i < pad; i++)); do rule="${rule}─"; done
+  printf '  ╰%s %s ─╯\n' "$rule" "$title"
+}
+
+test_composer_state_grok_approval_mode_title() {
+  local dir log resp fb out n=1 title verdict
+  dir="$TMP_ROOT/composer-grok-approval-mode"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  fb=$(make_herdr_fakebin "$dir")
+  printf '%s\n' \
+    '  ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮' \
+    '  │ ❯                                                                                                         │' \
+    '  ╰───────────────────────────────────────────────────────────────────────── Grok 4.7 (low) · always-approve ─╯' \
+    '' \
+    '  Shift+Tab:mode  │  Ctrl+c:cancel  │  Ctrl+.:shortcuts' > "$resp/1.out"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = empty ] || fail "an idle Grok 1.0.50 composer titled with its approval mode should read empty, got '$out'"
+  n=2
+  while IFS='|' read -r verdict title; do
+    if [ "$verdict" = pending ]; then
+      grok_titled_box 74 "$title" 'deploy the fix' > "$resp/$n.out"
+    else
+      grok_titled_box 74 "$title" '' > "$resp/$n.out"
+    fi
+    out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+      bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+    [ "$out" = "$verdict" ] || fail "Grok title '$title' should read $verdict, got '$out'"
+    n=$((n + 1))
+  done <<'EOF'
+empty|Grok 4.7 (high)
+empty|Grok 4.7 (high) · plan
+empty|Grok 4.7 (high) · auto-review
+empty|Grok 4.7 (high) · always-approve
+empty|Grok 4.7 (high) · plan · always-approve
+pending|Grok 4.7 (high) · plan · always-approve
+pending|Grok 4.7 (low) · always-approve
+unknown|Grok 4.7 (high) · yolo
+unknown|Grok 4.7 (high) · always-approve · plan
+unknown|Grok 4.7 · always-approve
+unknown|Composer · always-approve
+unknown|Grok 4.7 (high) ·  always-approve
+EOF
+  pass "fm_backend_herdr_composer_state: Grok 1.0.50 approval-mode titles keep safe verdicts and unknown labels stay unproven"
+}
+
 # Live-verified incident (2026-07-03, real grok 0.2.82 on herdr, isolated
 # session): typing "/compact" opens the completion popup; the FIRST Enter
 # closes the popup and EXPANDS the composer into an argument-hint placeholder
@@ -6024,6 +6082,7 @@ test_composer_state_bare_prompt_is_empty
 test_composer_state_styled_placeholder_draft_is_pending
 test_composer_state_real_text_is_pending
 test_composer_state_grok_oversized_title_preserves_safe_verdicts
+test_composer_state_grok_approval_mode_title
 test_composer_state_popup_placeholder_fill_is_pending
 test_composer_state_unknown_on_capture_failure
 test_composer_state_inactive_session_fails_fast_without_server_autostart

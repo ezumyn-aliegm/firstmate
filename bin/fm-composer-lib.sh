@@ -54,7 +54,8 @@
 #                older claude). The bottom border may carry a TITLE (grok
 #                writes its model name there); a titled bottom border that
 #                still starts and ends with the family's rule glyph is
-#                tolerated, including Grok 1.0.5's three-column title overhang.
+#                tolerated, including Grok 1.0.5's three-column title overhang
+#                and Grok 1.0.50's ` · <approval-mode>` title suffix.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
 #                proof; a bare SHELL glyph (`>` `$` `%` `#`) never is.
@@ -561,9 +562,9 @@ FM_COMPOSER_PI_MAX_LINES=${FM_COMPOSER_PI_MAX_LINES:-8}
 
 # Column overhang of Grok 1.0.5's titled bottom border over its aligned top
 # and content rows, captured live in issue #3436's 2026-09-14 idle repro
-# (see docs/verification/runtime-backends.md). Not re-verified against a live
-# Grok install since; may need to change if a future Grok release renders a
-# different overhang or scales it with title/model-name length.
+# (see docs/verification/runtime-backends.md). Grok 1.0.50 renders the box
+# aligned (verified live 2026-10-10), so this applies only to older releases;
+# may need to change if a future Grok release renders a different overhang.
 FM_COMPOSER_GROK_TITLE_OVERHANG=3
 
 # 0 when <content> is exactly one glyph drawn from <glyph-list>.
@@ -1060,41 +1061,18 @@ EOF
   fi
 }
 
-# 0 when a mismatched bottom border reads as a legitimate TITLE: the trimmed
-# inner (corners already stripped) still starts and ends with the family's own
-# rule glyph, so the title is embedded IN the rule rather than replacing it.
-_fm_composer_titled_bottom_ok() {  # <family> <bottom-inner> <top-spaces>
-  local family=$1 inner=$2 expected=$3 dash spaces title effort model
-  fm_composer_normalize_trim_var inner
-  case "$family" in
-    rounded|light) dash='─' ;;
-    double) dash='═' ;;
-    heavy) dash='━' ;;
-    ascii) dash='-' ;;
-    *) return 1 ;;
+# 0 when <title> is Grok's typed model/effort title, `Grok <model> (<effort>)`,
+# optionally followed by one of the approval-mode labels Grok 1.0.50 renders
+# after it on the same border (captured live by cycling Shift+Tab and Ctrl+O;
+# see docs/verification/runtime-backends.md). Any other suffix is unproven.
+_fm_composer_grok_title_ok() {  # <trimmed-title>
+  local title=$1 effort model
+  case "$title" in
+    *' · plan · always-approve') title=${title%' · plan · always-approve'} ;;
+    *' · always-approve') title=${title%' · always-approve'} ;;
+    *' · auto-review') title=${title%' · auto-review'} ;;
+    *' · plan') title=${title%' · plan'} ;;
   esac
-  case "$inner" in
-    "$dash"*"$dash") ;;
-    *) return 1 ;;
-  esac
-  spaces=${inner//"$dash"/ }
-  spaces=$(printf '%s' "$spaces" | LC_ALL=C sed 's/[!-~]/ /g')
-  case "$spaces" in
-    *[![:space:]]*) return 1 ;;
-  esac
-  [ "$spaces" = "$expected" ] && return 0
-
-  # Grok 1.0.5 renders its real model title FM_COMPOSER_GROK_TITLE_OVERHANG
-  # columns wider than the otherwise aligned top and content rows (issue
-  # #3436; see the constant's definition for provenance and caveats). Accept
-  # only that exact overhang and only the typed Grok model/effort title
-  # shape. This keeps arbitrary malformed bottoms ambiguous while preserving
-  # the complete-box proof around a genuinely idle or pending Grok composer.
-  local overhang
-  overhang=$(printf '%*s' "$FM_COMPOSER_GROK_TITLE_OVERHANG" '')
-  [ "$spaces" = "$expected$overhang" ] || return 1
-  title=${inner//"$dash"/}
-  fm_composer_normalize_trim_var title
   case "$title" in
     'Grok '*\ \(low\)) effort=low ;;
     'Grok '*\ \(medium\)) effort=medium ;;
@@ -1107,6 +1085,48 @@ _fm_composer_titled_bottom_ok() {  # <family> <bottom-inner> <top-spaces>
   [ -n "$model" ] || return 1
   case "$model" in *[!A-Za-z0-9._-]*) return 1 ;; esac
   return 0
+}
+
+# 0 when a mismatched bottom border reads as a legitimate TITLE: the trimmed
+# inner (corners already stripped) still starts and ends with the family's own
+# rule glyph, so the title is embedded IN the rule rather than replacing it.
+# Title text is ASCII-printable, except the one-column `·` separator that is
+# accepted only inside a proven Grok approval-mode title.
+_fm_composer_titled_bottom_ok() {  # <family> <bottom-inner> <top-spaces>
+  local family=$1 inner=$2 expected=$3 dash spaces title grok_title=0
+  fm_composer_normalize_trim_var inner
+  case "$family" in
+    rounded|light) dash='─' ;;
+    double) dash='═' ;;
+    heavy) dash='━' ;;
+    ascii) dash='-' ;;
+    *) return 1 ;;
+  esac
+  case "$inner" in
+    "$dash"*"$dash") ;;
+    *) return 1 ;;
+  esac
+  title=${inner//"$dash"/}
+  fm_composer_normalize_trim_var title
+  _fm_composer_grok_title_ok "$title" && grok_title=1
+  spaces=${inner//"$dash"/ }
+  [ "$grok_title" = 1 ] && spaces=${spaces//·/ }
+  spaces=$(printf '%s' "$spaces" | LC_ALL=C sed 's/[!-~]/ /g')
+  case "$spaces" in
+    *[![:space:]]*) return 1 ;;
+  esac
+  [ "$spaces" = "$expected" ] && return 0
+
+  # Grok 1.0.5 renders its real model title FM_COMPOSER_GROK_TITLE_OVERHANG
+  # columns wider than the otherwise aligned top and content rows (issue
+  # #3436; see the constant's definition for provenance and caveats). Accept
+  # only that exact overhang and only the typed Grok title shape. This keeps
+  # arbitrary malformed bottoms ambiguous while preserving the complete-box
+  # proof around a genuinely idle or pending Grok composer.
+  local overhang
+  overhang=$(printf '%*s' "$FM_COMPOSER_GROK_TITLE_OVERHANG" '')
+  [ "$spaces" = "$expected$overhang" ] || return 1
+  [ "$grok_title" = 1 ]
 }
 
 # fm_composer_row_has_edge: 0 when the trimmed row starts or ends with a

@@ -1,7 +1,7 @@
 # Grok Build
 
 The xAI `grok` TUI is Claude-Code-compatible.
-Verified initially on 2026-06-29 with 0.2.73, slash submission on 2026-07-03 with 0.2.82, effort on 2026-07-13 with 0.2.99, exit on 2026-07-19 with 0.2.103, and folder trust, the training opt-in, and unsent composer delivery on 2026-09-24 with 1.0.41.
+Verified initially on 2026-06-29 with 0.2.73, slash submission on 2026-07-03 with 0.2.82, effort on 2026-07-13 with 0.2.99, exit on 2026-07-19 with 0.2.103, folder trust, the training opt-in, and unsent composer delivery on 2026-09-24 with 1.0.41, and the composer's approval-mode title on 2026-10-10 with 1.0.50.
 Launch shape: `grok --always-approve "$(cat <brief>)"`.
 
 ## Operating facts
@@ -66,6 +66,10 @@ Fresh placeholder `Type a message...` uses dark 24-bit TRUECOLOR, not SGR-2.
 On Grok 0.2.93, real input `38;2;224;222;244` measured about 225 luminance, while borders and placeholder ranged from `38;2;50;47;70` through `38;2;110;106;134`, about 51-110, and were dropped.
 The truecolor rule assumes the fleet's dark theme; SGR-2 is theme-independent.
 Coverage is `../../../tests/fm-composer-ghost.test.sh` and `../../../tests/fm-backend-herdr.test.sh`.
+
+Grok writes `Grok <model> (<effort>)` into the composer's bottom border.
+Since 1.0.50 it appends the approval mode after a one-column `·`: ` · plan`, ` · auto-review`, ` · always-approve`, or ` · plan · always-approve`, and the bordered box is aligned rather than 1.0.5's three-column overhang.
+The shared classifier accepts only those suffixes (`_fm_composer_grok_title_ok` in `../../../bin/fm-composer-lib.sh`), so a new Grok label reads `unknown` and away-mode defers until the classifier learns it.
 
 Tmux `#{cursor_y}` may point at the pristine composer's bottom border.
 The shared classifier locates the full box and all content rows, so border cursor and multi-row composers require no adapter offsets.
